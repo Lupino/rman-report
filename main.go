@@ -4,6 +4,7 @@ import (
     "time"
     "flag"
     "strconv"
+    "strings"
     "github.com/golang/glog"
     "github.com/bigdatadev/goryman"
     "github.com/Lupino/rman-report/sources"
@@ -52,21 +53,21 @@ func main() {
                     }
 
                     if rs.Name == "redis" {
-                        if "rdb_last_bgsave_status" == stat.Name || "aof_last_bgrewrite_status" == stat.Name {
+                        if strings.Contains("rdb_last_bgsave_status aof_last_bgrewrite_status", stat.Name) {
                             evt.State = stat.Value
                         } else {
                             evt.Description = stat.Value
                         }
 
-                        if "used_memory_human" == stat.Name || "used_memory_peak_human" == stat.Name {
+                        if strings.Contains("used_memory_human used_memory_peak_human", stat.Name) {
                             evt.Metric, _ = strconv.ParseFloat(stat.Value[:len(stat.Value)-1], 64)
                         }
                     }
 
                     if rs.Name == "memcached" {
-                        if "version" == stat.Name || "libevent" == stat.Name {
+                        if strings.Contains("version libevent", stat.Name) {
                             evt.Description = stat.Value
-                        } else if "rusage_user" == stat.Name || "rusage_system" == stat.Name {
+                        } else if strings.Contains("rusage_user rusage_system", stat.Name) {
                             evt.Metric, _ = strconv.ParseFloat(stat.Value, 64)
                         } else {
                             evt.Metric, _ = strconv.Atoi(stat.Value)
