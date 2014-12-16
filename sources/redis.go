@@ -45,7 +45,17 @@ func (rs redisSource) getAllInfo() (data []SourceData, err error) {
     for k, pool := range rs.pools {
         stats, err := getRedisInfo(pool)
         if err != nil {
-            continue
+            stats = make([]Stat, 1)
+            stats[0] = Stat{
+                Name: "stat",
+                Value: "error",
+            }
+        } else {
+            stat := Stat{
+                Name: "stat",
+                Value: "ok",
+            }
+            stats = append(stats, stat)
         }
         data[idx] = SourceData{
             Name: "redis",
@@ -54,7 +64,7 @@ func (rs redisSource) getAllInfo() (data []SourceData, err error) {
         }
         idx ++
     }
-    return
+    return data, nil
 }
 
 func newRedisPool(host_port string) *redis.Pool {
@@ -72,7 +82,8 @@ func getRedisInfo(pool *redis.Pool) ([]Stat, error) {
 
     reply, err := redis.Bytes(conn.Do("info"))
     if err != nil {
-        glog.Fatalf("unable to request redis info: %s", err)
+        glog.Errorf("unable to request redis info: %s", err)
+        return nil, err
     }
     reader := bufio.NewReader(bytes.NewReader(reply))
     retval := make(map[string]string)

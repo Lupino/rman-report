@@ -53,7 +53,7 @@ func main() {
                     }
 
                     if rs.Name == "redis" {
-                        if strings.Contains("rdb_last_bgsave_status aof_last_bgrewrite_status", stat.Name) {
+                        if strings.Contains("rdb_last_bgsave_status aof_last_bgrewrite_status stat", stat.Name) {
                             evt.State = stat.Value
                         } else {
                             evt.Description = stat.Value
@@ -69,6 +69,9 @@ func main() {
                             evt.Description = stat.Value
                         } else if strings.Contains("rusage_user rusage_system", stat.Name) {
                             evt.Metric, _ = strconv.ParseFloat(stat.Value, 64)
+
+                        } else if strings.Contains("stat", stat.Name) {
+                            evt.State = stat.Value
                         } else {
                             evt.Metric, _ = strconv.Atoi(stat.Value)
                         }

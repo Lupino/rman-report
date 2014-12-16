@@ -77,7 +77,17 @@ func (ms memcachedSource) getAllInfo() (data []SourceData, err error) {
     for hostname, host := range ms.hosts {
         stats, err := getMamcachedStat(host)
         if err != nil {
-            continue
+            stats = make([]Stat, 1)
+            stats[0] = Stat{
+                Name: "stat",
+                Value: "error",
+            }
+        } else {
+            stat := Stat{
+                Name: "stat",
+                Value: "ok",
+            }
+            stats = append(stats, stat)
         }
         data[idx] = SourceData{
             Name: "memcached",
@@ -86,13 +96,13 @@ func (ms memcachedSource) getAllInfo() (data []SourceData, err error) {
         }
         idx ++
     }
-    return
+    return data, nil
 }
 
 func getMamcachedStat(host MemcachedHost) ([]Stat, error) {
     conn, err := net.Dial("tcp", string(host))
     if err != nil {
-        glog.Fatalf("connect memcached %s fail: %s", host, err)
+        glog.Errorf("connect memcached %s fail: %s", host, err)
     }
     fmt.Fprintf(conn, "stats\n")
     retval := make(map[string]string)
