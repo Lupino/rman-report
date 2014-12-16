@@ -10,43 +10,54 @@ import (
 
 var HostsFile = flag.String("hosts_file", "hosts", "specify the cadvisors location")
 
-type ExternalSource struct {
-    redis redisSource
+type EntryPoints struct {
+    Redis     RedisHosts     `json:"redis"`
+    Memcached MemcachedHosts `json:"memcached"`
 }
 
-func (self *ExternalSource) getRedisHosts() (RedisHosts, error) {
+type ExternalSource struct {
+    redis redisSource
+    memcached memcachedSource
+    entrypoints EntryPoints
+}
+
+func (self *ExternalSource) loadHosts() (error) {
     fi, err := os.Stat(*HostsFile)
     if err != nil {
-        return nil, err
+        return err
     }
     if fi.Size() == 0 {
-        return RedisHosts{}, nil
+        return nil
     }
     contents, err := ioutil.ReadFile(*HostsFile)
     if err != nil {
-        return nil, err
+        return err
     }
 
-    type config map[string]map[string]string
-    var c config
-    err = json.Unmarshal(contents, &c)
+    err = json.Unmarshal(contents, &self.entrypoints)
     if err != nil {
-        return nil, fmt.Errorf("failed to unmarshal contents of file %s. Error: %s", HostsFile, err)
+        return fmt.Errorf("failed to unmarshal contents of file %s. Error: %s", HostsFile, err)
     }
-
-    redisConfig, ok := c["redis"]
-    if !ok {
-        return nil, fmt.Errorf("failed to find redis config of file %s. Error: %s", HostsFile, err)
-    }
-    var redisHosts = make(RedisHosts)
-    for k, v := range redisConfig {
-        redisHosts[k] = RedisHost(v)
-    }
-    return redisHosts, nil
+    return nil
 }
 
 func (self *ExternalSource) GetInfo() ([]SourceData, error) {
-    return self.redis.getAllInfo()
+    var sourceData = make([]SourceData, 0)
+    if self.entrypoints.Redis != nil {
+        stdatas, _ := self.redis.getAllInfo()
+        for _, stdata := range stdatas {
+            sourceData = append(sourceData, stdata)
+        }
+    }
+
+    if self.entrypoints.Memcached != nil {
+        stdatas, _ := self.memcached.getAllInfo()
+        for _, stdata := range stdatas {
+            sourceData = append(sourceData, stdata)
+        }
+    }
+
+    return sourceData, nil
 }
 
 
@@ -55,10 +66,11 @@ func newExternalSource() (Source, error) {
         return nil, fmt.Errorf("Cannot stat hosts_file %s. Error: %s", *HostsFile, err)
     }
     source := new(ExternalSource)
-    hosts, err := source.getRedisHosts()
+    err := source.loadHosts()
     if err != nil {
         return nil, err
     }
-    source.redis = newRedisSource(hosts)
+    source.redis = newRedisSource(source.entrypoints.Redis)
+    source.memcached = newMemcachedSource(source.entrypoints.Memcached)
     return source, nil
 }

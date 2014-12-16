@@ -51,14 +51,26 @@ func main() {
                         // Description: stat.Value,
                     }
 
-                    if "rdb_last_bgsave_status" == stat.Name || "aof_last_bgrewrite_status" == stat.Name {
-                        evt.State = stat.Value
-                    } else {
-                        evt.Description = stat.Value
+                    if rs.Name == "redis" {
+                        if "rdb_last_bgsave_status" == stat.Name || "aof_last_bgrewrite_status" == stat.Name {
+                            evt.State = stat.Value
+                        } else {
+                            evt.Description = stat.Value
+                        }
+
+                        if "used_memory_human" == stat.Name || "used_memory_peak_human" == stat.Name {
+                            evt.Metric, _ = strconv.ParseFloat(stat.Value[:len(stat.Value)-1], 64)
+                        }
                     }
 
-                    if "used_memory_human" == stat.Name || "used_memory_peak_human" == stat.Name {
-                        evt.Metric, _ = strconv.ParseFloat(stat.Value[:len(stat.Value)-1], 64)
+                    if rs.Name == "memcached" {
+                        if "version" == stat.Name || "libevent" == stat.Name {
+                            evt.Description = stat.Value
+                        } else if "rusage_user" == stat.Name || "rusage_system" == stat.Name {
+                            evt.Metric, _ = strconv.ParseFloat(stat.Value, 64)
+                        } else {
+                            evt.Metric, _ = strconv.Atoi(stat.Value)
+                        }
                     }
 
                     err = r.SendEvent(evt)
