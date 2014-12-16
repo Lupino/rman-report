@@ -52,6 +52,7 @@ func (rs redisSource) getAllInfo() (data []SourceData, err error) {
             Hostname: k,
             Stats: stats,
         }
+        idx ++
     }
     return
 }
