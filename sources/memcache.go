@@ -103,6 +103,7 @@ func getMamcachedStat(host MemcachedHost) ([]Stat, error) {
     conn, err := net.Dial("tcp", string(host))
     if err != nil {
         glog.Errorf("connect memcached %s fail: %s", host, err)
+        return nil, err
     }
     fmt.Fprintf(conn, "stats\n")
     retval := make(map[string]string)
