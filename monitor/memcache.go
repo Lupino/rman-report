@@ -1,4 +1,4 @@
-package sources
+package monitor
 
 import (
     "fmt"
@@ -65,38 +65,45 @@ type MemcachedHosts map[string]MemcachedHost
 
 type memcachedSource struct {
     hosts MemcachedHosts
+    m Monitor
 }
 
-func newMemcachedSource(hosts MemcachedHosts) memcachedSource {
-    return memcachedSource{hosts: hosts}
+func newMemcachedSource(hosts MemcachedHosts, monitor Monitor) memcachedSource {
+    return memcachedSource{hosts: hosts, m: monitor}
 }
 
-func (ms memcachedSource) getAllInfo() (data []SourceData, err error) {
-    data = make([]SourceData, len(ms.hosts))
-    var idx = 0
+func (ms memcachedSource) monitor() {
     for hostname, host := range ms.hosts {
-        stats, err := getMamcachedStat(host)
-        if err != nil {
-            stats = make([]Stat, 1)
-            stats[0] = Stat{
-                Name: "stat",
-                Value: "error",
-            }
-        } else {
-            stat := Stat{
-                Name: "stat",
-                Value: "ok",
-            }
-            stats = append(stats, stat)
-        }
-        data[idx] = SourceData{
-            Name: "memcached",
-            Hostname: hostname,
-            Stats: stats,
-        }
-        idx ++
+        go ms.monitorOne(hostname, host)
+
     }
-    return data, nil
+}
+
+func (ms memcachedSource) monitorOne(hostname string, host MemcachedHost) {
+    ticker := ms.m.NewTicker().C
+    for {
+        select {
+        case <-ticker:
+            stats, err := getMamcachedStat(host)
+            if err != nil {
+                stats = make([]Stat, 1)
+                stats[0] = Stat{
+                    Name: "stat",
+                    Value: "error",
+                }
+            } else {
+                stat := Stat{
+                    Name: "stat",
+                    Value: "ok",
+                }
+                stats = append(stats, stat)
+            }
+
+            for _, stat := range stats {
+                ms.m.HandleStat("memcached", hostname, stat)
+            }
+        }
+    }
 }
 
 func getMamcachedStat(host MemcachedHost) ([]Stat, error) {

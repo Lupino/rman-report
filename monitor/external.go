@@ -1,4 +1,4 @@
-package sources
+package monitor
 
 import (
     "encoding/json"
@@ -8,7 +8,7 @@ import (
     "flag"
 )
 
-var HostsFile = flag.String("hosts_file", "hosts", "specify the cadvisors location")
+var HostsFile = flag.String("hosts_file", "hosts", "specify the source server location")
 
 type EntryPoints struct {
     Redis     RedisHosts     `json:"redis"`
@@ -41,27 +41,18 @@ func (self *ExternalSource) loadHosts() (error) {
     return nil
 }
 
-func (self *ExternalSource) GetInfo() ([]SourceData, error) {
-    var sourceData = make([]SourceData, 0)
+func (self *ExternalSource) Monitor() {
     if self.entrypoints.Redis != nil {
-        stdatas, _ := self.redis.getAllInfo()
-        for _, stdata := range stdatas {
-            sourceData = append(sourceData, stdata)
-        }
+        self.redis.monitor()
     }
 
     if self.entrypoints.Memcached != nil {
-        stdatas, _ := self.memcached.getAllInfo()
-        for _, stdata := range stdatas {
-            sourceData = append(sourceData, stdata)
-        }
+        self.memcached.monitor()
     }
-
-    return sourceData, nil
 }
 
 
-func newExternalSource() (Source, error) {
+func newExternalSource(m Monitor) (Source, error) {
     if _, err := os.Stat(*HostsFile); err != nil {
         return nil, fmt.Errorf("Cannot stat hosts_file %s. Error: %s", *HostsFile, err)
     }
@@ -70,7 +61,7 @@ func newExternalSource() (Source, error) {
     if err != nil {
         return nil, err
     }
-    source.redis = newRedisSource(source.entrypoints.Redis)
-    source.memcached = newMemcachedSource(source.entrypoints.Memcached)
+    source.redis = newRedisSource(source.entrypoints.Redis, m)
+    source.memcached = newMemcachedSource(source.entrypoints.Memcached, m)
     return source, nil
 }

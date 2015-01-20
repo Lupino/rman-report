@@ -1,4 +1,4 @@
-package sources
+package monitor
 
 import (
     "bytes"
@@ -29,42 +29,47 @@ type RedisHosts map[string]RedisHost
 
 type redisSource struct {
     pools map[string]*redis.Pool
+    m Monitor
 }
 
-func newRedisSource(hosts RedisHosts) redisSource {
+func newRedisSource(hosts RedisHosts, m Monitor) redisSource {
     pools := make(map[string]*redis.Pool)
     for k, v := range hosts {
         pools[k] = newRedisPool(string(v))
     }
-    return redisSource{pools:pools}
+    return redisSource{pools:pools,m:m}
 }
 
-func (rs redisSource) getAllInfo() (data []SourceData, err error) {
-    data = make([]SourceData, len(rs.pools))
-    var idx = 0
+func (rs redisSource) monitor() {
     for k, pool := range rs.pools {
-        stats, err := getRedisInfo(pool)
-        if err != nil {
-            stats = make([]Stat, 1)
-            stats[0] = Stat{
-                Name: "stat",
-                Value: "error",
-            }
-        } else {
-            stat := Stat{
-                Name: "stat",
-                Value: "ok",
-            }
-            stats = append(stats, stat)
-        }
-        data[idx] = SourceData{
-            Name: "redis",
-            Hostname: k,
-            Stats: stats,
-        }
-        idx ++
+        go rs.monitorOne(k, pool)
     }
-    return data, nil
+}
+
+func (rs redisSource) monitorOne(k string, pool *redis.Pool) {
+    ticker := rs.m.NewTicker().C
+    for {
+        select {
+        case <-ticker:
+            stats, err := getRedisInfo(pool)
+            if err != nil {
+                stats = make([]Stat, 1)
+                stats[0] = Stat{
+                    Name: "stat",
+                    Value: "error",
+                }
+            } else {
+                stat := Stat{
+                    Name: "stat",
+                    Value: "ok",
+                }
+                stats = append(stats, stat)
+            }
+            for _, stat := range stats {
+                rs.m.HandleStat("redis", k, stat)
+            }
+        }
+    }
 }
 
 func newRedisPool(host_port string) *redis.Pool {
