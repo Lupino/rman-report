@@ -9,19 +9,19 @@ import (
 )
 
 var REDIS_STRING_VALUES = []string{
-    "redis_version",
-    "redis_git_sha1",
-    "redis_mode",
-    "os",
-    "multiplexing_api",
-    "gcc_version",
-    "run_id",
+    // "redis_version",
+    // "redis_git_sha1",
+    // "redis_mode",
+    // "os",
+    // "multiplexing_api",
+    // "gcc_version",
+    // "run_id",
     "used_memory_human",
     "used_memory_peak_human",
-    "mem_allocator",
-    "rdb_last_bgsave_status",
-    "aof_last_bgrewrite_status",
-    "role",
+    // "mem_allocator",
+    // "rdb_last_bgsave_status",
+    // "aof_last_bgrewrite_status",
+    // "role",
 }
 
 type RedisHost string
