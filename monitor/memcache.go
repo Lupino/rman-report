@@ -100,7 +100,7 @@ func (ms memcachedSource) monitorOne(hostname string, host MemcachedHost) {
             }
 
             for _, stat := range stats {
-                ms.m.HandleStat("memcached", hostname, stat)
+                go ms.m.HandleStat("memcached", hostname, stat)
             }
         }
     }

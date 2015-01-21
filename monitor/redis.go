@@ -66,7 +66,7 @@ func (rs redisSource) monitorOne(k string, pool *redis.Pool) {
                 stats = append(stats, stat)
             }
             for _, stat := range stats {
-                rs.m.HandleStat("redis", k, stat)
+                go rs.m.HandleStat("redis", k, stat)
             }
         }
     }
