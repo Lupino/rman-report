@@ -41,7 +41,14 @@ func (rm riemannMonitor) HandleStat(serverType, hostname string, stat Stat) {
         }
 
         if strings.Contains("used_memory_human used_memory_peak_human", stat.Name) {
-            evt.Metric, _ = strconv.ParseFloat(stat.Value[:len(stat.Value)-1], 64)
+            metric, _ := strconv.ParseFloat(stat.Value[:len(stat.Value)-1], 64)
+
+            if strings.HasSuffix(stat.Value, "M") {
+                metric /= 1024
+            }
+
+            evt.Service += " (G)"
+            evt.Metric = metric
         }
     }
 
