@@ -4,24 +4,14 @@ import (
     "bytes"
     "bufio"
     "strings"
+    "strconv"
     "github.com/golang/glog"
     "github.com/garyburd/redigo/redis"
 )
 
 var REDIS_STRING_VALUES = []string{
-    // "redis_version",
-    // "redis_git_sha1",
-    // "redis_mode",
-    // "os",
-    // "multiplexing_api",
-    // "gcc_version",
-    // "run_id",
     "used_memory_human",
     "used_memory_peak_human",
-    // "mem_allocator",
-    // "rdb_last_bgsave_status",
-    // "aof_last_bgrewrite_status",
-    // "role",
 }
 
 type RedisHost string
@@ -46,27 +36,23 @@ func (rs redisSource) monitor() {
     }
 }
 
-func (rs redisSource) monitorOne(k string, pool *redis.Pool) {
+func (rs redisSource) monitorOne(hostname string, pool *redis.Pool) {
     ticker := rs.m.NewTicker().C
     for {
         select {
         case <-ticker:
             stats, err := getRedisInfo(pool)
-            if err != nil {
-                stats = make([]Stat, 1)
-                stats[0] = Stat{
-                    Name: "stat",
-                    Value: "error",
-                }
-            } else {
-                stat := Stat{
-                    Name: "stat",
-                    Value: "ok",
-                }
-                stats = append(stats, stat)
+            var stat = Stat{
+                Name: "state",
+                State: "ok",
             }
+            if err != nil {
+                stat.State = "error"
+            }
+            stats = append(stats, stat)
             for _, stat := range stats {
-                go rs.m.HandleStat("redis", k, stat)
+                stat.Host = hostname
+                go rs.m.HandleStat("redis", stat)
             }
         }
     }
@@ -108,11 +94,26 @@ func getRedisInfo(pool *redis.Pool) ([]Stat, error) {
     }
 
     stats := make([]Stat, len(REDIS_STRING_VALUES))
-    for i, str := range REDIS_STRING_VALUES {
-        stats[i] = Stat{
-            Name: str,
-            Value: retval[str],
+    for i, name := range REDIS_STRING_VALUES {
+        desc := retval[name]
+        var stat = Stat{
+            Name: name,
+            Desc: desc,
+            State: "ok",
         }
+
+        if strings.Contains("used_memory_human used_memory_peak_human", name) {
+            metric, _ := strconv.ParseFloat(desc[:len(desc) - 1], 64)
+
+            if strings.HasSuffix(desc, "M") {
+                metric /= 1024
+            }
+
+            name += " (G)"
+
+            stat.Metric = metric
+        }
+        stats[i] =  stat
     }
     return stats, nil
 }

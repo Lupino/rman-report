@@ -6,58 +6,15 @@ import (
     "bytes"
     "bufio"
     "strings"
+    "strconv"
     "github.com/golang/glog"
 )
 
 var MEMCACHED_STRING_VALUES = []string{
-    // "uptime",
-    // "version",
-    // "libevent",
-    // "pointer_size",
-    // "rusage_user",
-    // "rusage_system",
     "curr_connections",
-    // "total_connections",
-    // "connection_structures",
-    // "reserved_fds",
-    // "cmd_get",
-    // "cmd_set",
-    // "cmd_flush",
-    // "cmd_touch",
-    // "get_hits",
-    // "get_misses",
-    // "delete_misses",
-    // "delete_hits",
-    // "incr_misses",
-    // "incr_hits",
-    // "decr_misses",
-    // "decr_hits",
-    // "cas_misses",
-    // "cas_hits",
-    // "cas_badval",
-    // "touch_hits",
-    // "touch_misses",
-    // "auth_cmds",
-    // "auth_errors",
-    // "bytes_read",
-    // "bytes_written",
     "limit_maxbytes",
-    // "accepting_conns",
-    // "listen_disabled_num",
-    // "threads",
-    // "conn_yields",
-    // "hash_power_level",
-    // "hash_bytes",
-    // "hash_is_expanding",
-    // "malloc_fails",
     "bytes",
     "curr_items",
-    // "total_items",
-    // "expired_unfetched",
-    // "evicted_unfetched",
-    // "evictions",
-    // "reclaimed",
-    // "crawler_reclaimed",
 }
 
 type MemcachedHost string
@@ -85,22 +42,17 @@ func (ms memcachedSource) monitorOne(hostname string, host MemcachedHost) {
         select {
         case <-ticker:
             stats, err := getMamcachedStat(host)
-            if err != nil {
-                stats = make([]Stat, 1)
-                stats[0] = Stat{
-                    Name: "stat",
-                    Value: "error",
-                }
-            } else {
-                stat := Stat{
-                    Name: "stat",
-                    Value: "ok",
-                }
-                stats = append(stats, stat)
+            var stat = Stat{
+                Name: "state",
+                State: "ok",
             }
-
+            if err != nil {
+                stat.State = "error"
+            }
+            stats = append(stats, stat)
             for _, stat := range stats {
-                go ms.m.HandleStat("memcached", hostname, stat)
+                stat.Host = hostname
+                go ms.m.HandleStat("memcached", stat)
             }
         }
     }
@@ -131,11 +83,41 @@ func getMamcachedStat(host MemcachedHost) ([]Stat, error) {
     }
 
     stats := make([]Stat, len(MEMCACHED_STRING_VALUES))
-    for i, str := range MEMCACHED_STRING_VALUES {
-        stats[i] = Stat{
-            Name: str,
-            Value: retval[str],
-        }
+
+    limitMaxBytes, _ := strconv.Atoi(retval["limit_maxbytes"])
+    usageBytes, _ := strconv.Atoi(retval["bytes"])
+
+    var usage float64
+
+    if limitMaxBytes > 0 && limitMaxBytes > usageBytes {
+        usage = float64(usageBytes) / float64(limitMaxBytes)
     }
+
+    var state = "ok"
+    if usage > 0.95 {
+        state = "critical"
+    } else if usage > 0.9 {
+        state = "warning"
+    }
+
+    usageStat := Stat{
+        Name: "usage",
+        Metric: usage,
+        State: state,
+    }
+
+    for i, name := range MEMCACHED_STRING_VALUES {
+        desc := retval[name]
+        var stat = Stat{
+            Name: name,
+            // Desc: desc,
+            State: "ok",
+        }
+
+        stat.Metric, _ = strconv.Atoi(desc)
+
+        stats[i] =  stat
+    }
+    stats = append(stats, usageStat)
     return stats, nil
 }

@@ -6,7 +6,10 @@ import (
 
 type Stat struct {
     Name string
-    Value string
+    Host string
+    Metric interface{}
+    Desc   string
+    State string
 }
 
 type SourceHost struct {
@@ -23,7 +26,7 @@ func NewSource(m Monitor) (Source, error) {
 }
 
 type Monitor interface {
-    HandleStat(string, string, Stat)
+    HandleStat(string, Stat)
     Run()
     NewTicker() *time.Ticker
 }

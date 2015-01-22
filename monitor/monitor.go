@@ -3,8 +3,6 @@ package monitor
 import (
     "time"
     "flag"
-    "strconv"
-    "strings"
     "github.com/golang/glog"
     "github.com/bigdatadev/goryman"
 )
@@ -24,45 +22,14 @@ func NewRiemannMonitor() *riemannMonitor{
     return &riemannMonitor{client:client}
 }
 
-func (rm riemannMonitor) HandleStat(serverType, hostname string, stat Stat) {
+func (rm riemannMonitor) HandleStat(serverType string, stat Stat) {
     evt := &goryman.Event{
         Service: serverType + " " + stat.Name,
-        Host:    hostname,
-        // State:   stat.Value,
+        Host:    stat.Host,
+        State:   stat.State,
         Tags:    []string{serverType},
-        // Description: stat.Value,
-    }
-
-    if serverType == "redis" {
-        if strings.Contains("rdb_last_bgsave_status aof_last_bgrewrite_status stat", stat.Name) {
-            evt.State = stat.Value
-        } else {
-            evt.Description = stat.Value
-        }
-
-        if strings.Contains("used_memory_human used_memory_peak_human", stat.Name) {
-            metric, _ := strconv.ParseFloat(stat.Value[:len(stat.Value)-1], 64)
-
-            if strings.HasSuffix(stat.Value, "M") {
-                metric /= 1024
-            }
-
-            evt.Service += " (G)"
-            evt.Metric = metric
-        }
-    }
-
-    if serverType == "memcached" {
-        if strings.Contains("version libevent", stat.Name) {
-            evt.Description = stat.Value
-        } else if strings.Contains("rusage_user rusage_system", stat.Name) {
-            evt.Metric, _ = strconv.ParseFloat(stat.Value, 64)
-
-        } else if strings.Contains("stat", stat.Name) {
-            evt.State = stat.Value
-        } else {
-            evt.Metric, _ = strconv.Atoi(stat.Value)
-        }
+        Description: stat.Desc,
+        Metric: stat.Metric,
     }
 
     err := rm.client.SendEvent(evt)
